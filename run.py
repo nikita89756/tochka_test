@@ -105,7 +105,11 @@ class Solver:
         return moves
 
     def _all_moves(self, state: dict[tuple, str]) -> list[tuple[dict[tuple, str], int]]:
-        return self._moves_to_room(state) + self._moves_to_way(state)
+        to_room = self._moves_to_room(state)
+        if to_room:
+            return to_room
+        return self._moves_to_way(state)
+
 
     def solve(self) -> int:
         start = self._tuple(self.state)
