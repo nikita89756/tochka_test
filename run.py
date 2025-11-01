@@ -189,7 +189,6 @@ def main():
     
     solver = Solver(lines)
     result = solver.solve()
-    end_time = time.time()
     print(result)
 
 
