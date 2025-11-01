@@ -37,44 +37,6 @@ class Solver:
                 target_room = ROOMS_TO_IDS[obj]
                 dist = abs(pos - target_room) + 1
                 h += dist * ENERGY[obj]
-        rooms = {}
-        for i in ROOMS_IDS:
-            t = IDS_TO_ROOMS[i]
-            rooms[i] = {
-                'correct': 0,
-                'notcorrect': []
-            }
-            
-            correct = True
-            for depth in range(self.depth, 0, -1):
-                obj = state.get((i, depth))
-                if not obj or obj == '.':
-                    correct = False
-                    continue
-                if obj == t and correct:
-                    rooms[i]['correct'] += 1
-                else:
-                    correct = False
-                    if obj != t:
-                        rooms[i]['notcorrect'].append((depth, obj))
-
-        for room, info in rooms.items():
-            for depth, obj in info['notcorrect']:
-                id = ROOMS_TO_IDS[obj]
-                exit_cost = depth
-                corridor_cost = abs(room - id)
-                correct = rooms[id]['correct']
-                enter_cost = self.depth - correct
-                dist = exit_cost + corridor_cost + enter_cost
-                h += dist * ENERGY[obj]
-
-        for id, info in rooms.items():
-            room = IDS_TO_ROOMS[id]
-            correct = info['correct']
-            if correct < self.depth:
-                another = self.depth - correct
-                cost = ENERGY[room]
-                h += another * cost
         return h
 
     def _free_depth(self, state: dict[tuple, str], obj: str, room: int) -> int | None:
@@ -190,6 +152,7 @@ def main():
     solver = Solver(lines)
     result = solver.solve()
     print(result)
+
 
 
 if __name__ == "__main__":
