@@ -1,6 +1,5 @@
 import sys
 from heapq import heappush, heappop
-
 ENERGY = {'A': 1, 'B': 10, 'C': 100, 'D': 1000}
 ROOMS_TO_IDS = {'A': 2, 'B': 4, 'C': 6, 'D': 8}
 IDS_TO_ROOMS = {2:'A', 4:'B', 6:'C', 8:'D'}
@@ -23,13 +22,60 @@ class Solver:
         return tuple(items)
     
     def _finished(self, state: dict[tuple, str]) -> bool:
-        
         for pos, obj in state.items():
             if pos[0] == 'way':
                 return False
-            if obj !=IDS_TO_ROOMS[pos[0]]:
+            if obj != IDS_TO_ROOMS[pos[0]]:
                 return False
         return True
+
+    def _heuristic(self, state: dict[tuple, str]) -> int:
+        h = 0
+        for pos in range(11):
+            obj = state.get(('way', pos))
+            if obj and obj != '.':
+                target_room = ROOMS_TO_IDS[obj]
+                dist = abs(pos - target_room) + 1
+                h += dist * ENERGY[obj]
+        rooms = {}
+        for i in ROOMS_IDS:
+            t = IDS_TO_ROOMS[i]
+            rooms[i] = {
+                'correct': 0,
+                'notcorrect': []
+            }
+            
+            correct = True
+            for depth in range(self.depth, 0, -1):
+                obj = state.get((i, depth))
+                if not obj or obj == '.':
+                    correct = False
+                    continue
+                if obj == t and correct:
+                    rooms[i]['correct'] += 1
+                else:
+                    correct = False
+                    if obj != t:
+                        rooms[i]['notcorrect'].append((depth, obj))
+
+        for room, info in rooms.items():
+            for depth, obj in info['notcorrect']:
+                id = ROOMS_TO_IDS[obj]
+                exit_cost = depth
+                corridor_cost = abs(room - id)
+                correct = rooms[id]['correct']
+                enter_cost = self.depth - correct
+                dist = exit_cost + corridor_cost + enter_cost
+                h += dist * ENERGY[obj]
+
+        for id, info in rooms.items():
+            room = IDS_TO_ROOMS[id]
+            correct = info['correct']
+            if correct < self.depth:
+                another = self.depth - correct
+                cost = ENERGY[room]
+                h += another * cost
+        return h
 
     def _free_depth(self, state: dict[tuple, str], obj: str, room: int) -> int | None:
         if ROOMS_TO_IDS[obj] != room:
@@ -110,15 +156,15 @@ class Solver:
             return to_room
         return self._moves_to_way(state)
 
-
     def solve(self) -> int:
         start = self._tuple(self.state)
-        queue = [(0, start, self.state)]
+        h = self._heuristic(self.state)
+        queue = [(h, 0, start, self.state)]
         visited = set()
         costs = {start: 0}
         
         while queue:
-            cost, i, state = heappop(queue)
+            _, cost, i, state = heappop(queue)
             if i in visited:
                 continue
             
@@ -132,7 +178,9 @@ class Solver:
                 
                 if j not in costs or sumcost < costs[j]:
                     costs[j] = sumcost
-                    heappush(queue, (sumcost, j, next))
+                    h = self._heuristic(next)
+                    full = sumcost + h
+                    heappush(queue, (full, sumcost, j, next))
         
         return 0
 
@@ -141,7 +189,7 @@ def main():
     
     solver = Solver(lines)
     result = solver.solve()
-    
+    end_time = time.time()
     print(result)
 
 
