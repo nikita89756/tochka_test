@@ -1,6 +1,7 @@
 from collections import defaultdict, deque
 import sys
 
+
 class Solver:
     def __init__(self,edges: list[(str,str)]):
         self.graph = defaultdict(set)
@@ -49,12 +50,13 @@ class Solver:
             if target is None or min_dist == float('inf'):
                 break
             node = None
-            if dist[target] == 1:
+            if min_dist == 1:
                 node = self.virus
-            for nb in sorted(self.graph[target]):
-                if nb in dist and dist[nb] == dist[target] - 1:
-                    node = nb
-                    break
+            else:
+                for nb in sorted(self.graph[target]):
+                    if nb in dist and dist[nb] == min_dist - 1:
+                        node = nb
+                        break
             if node is None:
                 break
             self.moves.append(f"{target}-{node}")
@@ -89,6 +91,7 @@ def main():
     result = solver.solve()
     for edge in result:
         print(edge)
-        
+
+
 if __name__ == "__main__":
     main()
