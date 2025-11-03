@@ -60,18 +60,18 @@ class Solver:
             self.moves.append(f"{target}-{node}")
             self.graph[target].remove(node)
             self.graph[node].remove(target)
-
-            target, min_dist,_ = self._find_gate()
-            if target is not None and min_dist != float('inf'):
-                dist = self._bfs(target)
-                moved = False
-                for nb in sorted(self.graph[self.virus]):
-                    if nb in dist and dist[nb] < dist[self.virus]:
-                        self.virus = nb
-                        moved = True
-                        break
-                if not moved:
+            target, min_dist, _ = self._find_gate()  
+            if target is None or min_dist == float('inf'):
+                break
+            dist = self._bfs(self.virus)
+            d = dist[target]
+            next_node = None
+            for nb in sorted(self.graph[self.virus]):
+                if dist[nb] < d:
+                    next_node = nb
                     break
+            if next_node:
+                self.virus = next_node
             else:
                 break
         return self.moves
