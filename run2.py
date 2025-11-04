@@ -81,12 +81,13 @@ class Solver:
                 if bad_node:
                     move = (gate, node)
                     break
-            if move is None:
+            if move is None and len(moves)>0:
                 move = moves[0]
-            gate, node = move
-            self.moves.append(f"{gate}-{node}")
-            self.graph[gate].remove(node)
-            self.graph[node].remove(gate)
+            if move:
+                gate, node = move
+                self.moves.append(f"{gate}-{node}")
+                self.graph[gate].remove(node)
+                self.graph[node].remove(gate)
 
             next_node = self._get_node()
             if next_node:
