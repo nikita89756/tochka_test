@@ -41,61 +41,75 @@ class Solver:
             if dist[gate] < min_dist:
                 min_dist = dist[gate]
                 target = gate
-        return target, min_dist, dist
-    
-    def _get_node(self) -> str | None:
-        target, min_dist, _= self._find_gate()
-        
-        if target is None:
+        return target
+
+    def _get_node(self, pos: str) -> str | None:
+        gate = self._find_gate()
+        if gate is None:
             return None
 
-        for nb in sorted(self.graph[self.virus]):
-            dist_from_nb = self._bfs(nb)
-            if dist_from_nb.get(target, float('inf')) == min_dist - 1:
-                return nb
-        
-        return None
+        for nb in self.graph[pos]:
+            if nb.isupper():
+                return "__LOSE__"
 
-    def solve(self) -> list[str]:
-        while True:
-            moves = []
+        dist = self._bfs(gate)
+
+        curr = dist.get(pos, float("inf"))
+        mas = [nb for nb in self.graph[pos] if dist.get(nb, float("inf")) == curr - 1]
+        if not mas:
+            return None
+        return min(mas)
+
+    def _edges(self) -> list[(str, str)]:
+        edges = []
+        for g in self.gates:
+            for nb in self.graph[g]:
+                if not nb.isupper():
+                    edges.append((g, nb))
+        return sorted(edges)
+    
+    def _key(self, pos: str) -> tuple[str, frozenset]:
+            edges = []
             for gate in self.gates:
-                for neighbor in sorted(self.graph[gate]):
-                    if not neighbor.isupper():
-                        moves.append((gate, neighbor))
-            
-            move = None
+                for nb in self.graph[gate]:
+                    if not nb.isupper():
+                        edges.append((gate, nb))
+            return (pos, frozenset(edges))
+        
+    def solve(self) -> list[list[str]]:
+        results = []
+        visited = set()
+
+        def find_all(pos: str, path: list[str]):
+            st = self._key(pos)
+            if st in visited:
+                return
+            visited.add(st)
+            moves = self._edges()
+            if not moves:
+                return
             for gate, node in moves:
                 self.graph[gate].remove(node)
                 self.graph[node].remove(gate)
-                new_node = self._get_node()
-                bad_node = True
-                if new_node is not None:
-                    dist = self._bfs(new_node)
-                    gates = sum(1 for g in self.gates if dist.get(g) == 1)
-                    if gates > 1:
-                        bad_node = False
-                self.graph[gate].add(node)
-                self.graph[node].add(gate)
 
-                if bad_node:
-                    move = (gate, node)
-                    break
-            if move is None and len(moves)>0:
-                move = moves[0]
-            if move:
-                gate, node = move
-                self.moves.append(f"{gate}-{node}")
-                self.graph[gate].remove(node)
-                self.graph[node].remove(gate)
+                next = self._get_node(pos)
+                if next == "__LOSE__":
+                    self.graph[gate].add(node)
+                    self.graph[node].add(gate)
+                else:
+                    if next is None:
+                        results.append(path+[f"{gate}-{node}"])
+                        self.graph[gate].add(node)
+                        self.graph[node].add(gate)
+                    else:
+                        find_all(next, path + [f"{gate}-{node}"])
+                        self.graph[gate].add(node)
+                        self.graph[node].add(gate)
 
-            next_node = self._get_node()
-            if next_node:
-                self.virus = next_node
-            else:
-                break
-            
-        return self.moves
+        find_all(self.virus, [])
+        results.sort()
+        return results[0]
+
 
 def main():
     edges = []
