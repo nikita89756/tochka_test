@@ -1,7 +1,6 @@
 from collections import defaultdict, deque
 import sys
 
-
 class Solver:
     def __init__(self,edges: list[(str,str)]):
         self.graph = defaultdict(set)
@@ -43,47 +42,58 @@ class Solver:
                 min_dist = dist[gate]
                 target = gate
         return target, min_dist, dist
+    
+    def _get_node(self) -> str | None:
+        target, min_dist, _= self._find_gate()
+        
+        if target is None:
+            return None
+
+        for nb in sorted(self.graph[self.virus]):
+            dist_from_nb = self._bfs(nb)
+            if dist_from_nb.get(target, float('inf')) == min_dist - 1:
+                return nb
+        
+        return None
 
     def solve(self) -> list[str]:
         while True:
-            target, min_dist,dist = self._find_gate()
-            if target is None or min_dist == float('inf'):
-                break
-            node = None
-            if min_dist == 1:
-                node = self.virus
-            else:
-                for nb in sorted(self.graph[target]):
-                    if nb in dist and dist[nb] == min_dist - 1:
-                        node = nb
-                        break
-            if node is None:
-                break
-            self.moves.append(f"{target}-{node}")
-            self.graph[target].remove(node)
-            self.graph[node].remove(target)
-            dist = self._bfs(self.virus)
-            
-            target = None
-            min_dist = float('inf')
+            moves = []
             for gate in self.gates:
-                if dist[gate] < min_dist:
-                    min_dist = dist[gate]
-                    target = gate
+                for neighbor in sorted(self.graph[gate]):
+                    if not neighbor.isupper():
+                        moves.append((gate, neighbor))
+            
+            move = None
+            for gate, node in moves:
+                self.graph[gate].remove(node)
+                self.graph[node].remove(gate)
+                new_node = self._get_node()
+                bad_node = True
+                if new_node is not None:
+                    dist = self._bfs(new_node)
+                    gates = sum(1 for g in self.gates if dist.get(g) == 1)
+                    if gates > 1:
+                        bad_node = False
+                self.graph[gate].add(node)
+                self.graph[node].add(gate)
 
-            if target is None or min_dist == float('inf'):
-                break
-            next_node = None
-            for nb in sorted(self.graph[self.virus]):
-                if dist[nb] == dist[self.virus] + 1 and dist[nb] + 1 <= min_dist:
-                    nb_dist = self._bfs(nb)
-                    if nb_dist[target] == min_dist - 1:
-                        next_node = nb
-                        break
+                if bad_node:
+                    move = (gate, node)
+                    break
+            if move is None:
+                move = moves[0]
+            gate, node = move
+            self.moves.append(f"{gate}-{node}")
+            self.graph[gate].remove(node)
+            self.graph[node].remove(gate)
+
+            next_node = self._get_node()
             if next_node:
                 self.virus = next_node
             else:
                 break
+            
         return self.moves
 
 def main():
@@ -94,12 +104,10 @@ def main():
             node1, sep, node2 = line.partition('-')
             if sep:
                 edges.append((node1, node2))
-    
     solver = Solver(edges)
     result = solver.solve()
     for edge in result:
         print(edge)
-
 
 if __name__ == "__main__":
     main()
