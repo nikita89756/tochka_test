@@ -1,252 +1,148 @@
-from collections import defaultdict, deque
-from functools import lru_cache
 import sys
+from collections import deque, defaultdict
+from functools import lru_cache
 
 
-class Solver:
-    def __init__(self, edges: list[tuple[str, str]]):
-        self.graph = defaultdict(set)
-        self.nodes = set()
-        self.virus = 'a'
-        self.moves = []
-        gates = set()
+def normalize_connection(node_a: str, node_b: str) -> tuple[str, str]:
+    return tuple(sorted([node_a, node_b]))
 
-        for u, v in edges:
-            if u and u[0].isupper():
-                gates.add(u)
-            elif v and v[0].isupper():
-                gates.add(v)
-            self.graph[u].add(v)
-            self.graph[v].add(u)
-            self.nodes.add(u)
-            self.nodes.add(v)
 
-        self.gates = sorted(gates)
+def check_if_hub(vertex: str) -> bool:
+    return vertex[0].isupper()
 
-    def _is_gate(x: str) -> bool:
-        return bool(x) and x[0].isupper()
 
-    def _norm_edge(a: str, b: str) -> tuple[str, str]:
-        return (a, b) if a <= b else (b, a)
+def create_adjacency_map(connections):
+    adjacency = defaultdict(set)
+    for first, second in connections:
+        adjacency[first].add(second)
+        adjacency[second].add(first)
+    return adjacency
 
-    def _adjacency_from_edges(self, edges_norm: tuple[tuple[str, str], ...]) -> defaultdict[str, set[str]]:
-        g = defaultdict(set)
-        for x, y in edges_norm:
-            g[x].add(y)
-            g[y].add(x)
-        return g
 
-    def _dist_from(self, start: str, adj) -> dict[str, int]:
-        d = {start: 0}
-        q = deque([start])
-        while q:
-            cur = q.popleft()
-            for nb in adj.get(cur, ()):
-                if nb not in d:
-                    d[nb] = d[cur] + 1
-                    q.append(nb)
-        return d
+def calculate_distances(origin: str, adjacency):
+    distances = {origin: 0}
+    queue = deque([origin])
+    while queue:
+        current = queue.popleft()
+        for neighbor in adjacency[current]:
+            if neighbor not in distances:
+                distances[neighbor] = distances[current] + 1
+                queue.append(neighbor)
+    return distances
 
-    def _dist_from_gate(self, gate: str, adj) -> dict[str, int]:
-        d = {gate: 0}
-        q = deque([gate])
-        while q:
-            cur = q.popleft()
-            for nb in adj.get(cur, ()):
-                if nb not in d:
-                    d[nb] = d[cur] + 1
-                    q.append(nb)
-        return d
 
-    def _find_nearest_gate_lex(self, pos: str, adj):
-        dist = self._dist_from(pos, adj)
-        cand = [(dist[g], g) for g in adj.keys() if self._is_gate(g) and g in dist]
-        if not cand:
-            return None, None
-        cand.sort()
-        return cand[0][1], cand[0][0]
+def compute_paths_from_hub(hub_node: str, adjacency):
+    path_lengths = {hub_node: 0}
+    processing_queue = deque([hub_node])
+    while processing_queue:
+        node = processing_queue.popleft()
+        for adjacent in adjacency[node]:
+            if adjacent not in path_lengths:
+                path_lengths[adjacent] = path_lengths[node] + 1
+                processing_queue.append(adjacent)
+    return path_lengths
 
-    def _determine_next_towards(self, pos: str, gate: str, adj):
-        gate_d = self._dist_from_gate(gate, adj)
-        if pos not in gate_d:
-            return None
-        cd = gate_d[pos]
-        if cd == 0:
-            return None
-        best = [nb for nb in adj.get(pos, ()) if nb in gate_d and gate_d[nb] == cd - 1]
-        if not best:
-            return None
-        return sorted(best)[0]
 
-    def _simulate_virus_step(self, pos: str, adj):
-        g, _ = self._find_nearest_gate_lex(pos, adj)
-        if g is None:
-            return pos
-        nxt = self._determine_next_towards(pos, g, adj)
-        return nxt if nxt is not None else pos
+def find_nearest_hub(position: str, adjacency):
+    dist_map = calculate_distances(position, adjacency)
+    hub_candidates = []
+    for vertex in adjacency.keys():
+        if check_if_hub(vertex) and vertex in dist_map:
+            hub_candidates.append((dist_map[vertex], vertex))
+    
+    if not hub_candidates:
+        return None, None
+    
+    hub_candidates.sort()
+    return hub_candidates[0][1], hub_candidates[0][0]
 
-    def _bfs(self, start: str) -> dict[str, float]:
-        dist = {node: float('inf') for node in self.nodes}
-        if start not in self.graph:
-            return dist
-        dist[start] = 0
-        q = deque([start])
-        while q:
-            curr = q.popleft()
-            for nb in sorted(self.graph[curr]):
-                if dist[nb] == float('inf'):
-                    dist[nb] = dist[curr] + 1
-                    q.append(nb)
-        return dist
 
-    def _find_gate(self, pos: str):
-        adj = self.graph
-        g, _ = self._find_nearest_gate_lex(pos, adj)
-        return g
-
-    def _get_node(self, pos: str) -> str | None:
-        gate = self._find_gate(pos)
-        if gate is None:
-            return None
-
-        for nb in self.graph[pos]:
-            if self._is_gate(nb):
-                return "__LOSE__"
-
-        dist = self._bfs(gate)
-        curr = dist.get(pos, float("inf"))
-        mas = [nb for nb in self.graph[pos] if dist.get(nb, float("inf")) == curr - 1]
-        if not mas:
-            return None
-        return min(mas)
-
-    def _edges(self) -> list[tuple[str, str]]:
-        edges = []
-        for g in self.gates:
-            for nb in self.graph[g]:
-                if not self._is_gate(nb):
-                    edges.append((g, nb))
-        return sorted(edges)
-
-    def _key(self, pos: str) -> tuple[str, frozenset]:
-        edges = []
-        for gate in self.gates:
-            for nb in self.graph[gate]:
-                if not self._is_gate(nb):
-                    edges.append((gate, nb))
-        return (pos, frozenset(edges))
-
-    def _normalized_edges_tuple(self) -> tuple[tuple[str, str], ...]:
-        es = set()
-        for g in self.gates:
-            for nb in self.graph[g]:
-                if not self._is_gate(nb):
-                    es.add(self._norm_edge(g, nb))
-        return tuple(sorted(es))
-
-    @lru_cache(maxsize=None)
-    def _explore_strategy(self, virus_pos: str, available_edges: tuple[tuple[str, str], ...]):
-        adj = self._adjacency_from_edges(available_edges)
-
-        for u in self.nodes:
-            if self._is_gate(u):
-                continue
-            for v in self.graph[u]:
-                if not self._is_gate(v):
-                    adj[u].add(v)
-                    adj[v].add(u)
-
-        nearest_gate, _ = self._find_nearest_gate_lex(virus_pos, adj)
-        if nearest_gate is None:
-            return ()
-
-        blockable = []
-        for g in adj.keys():
-            if not self._is_gate(g):
-                continue
-            for nb in adj[g]:
-                if not self._is_gate(nb):
-                    blockable.append(f"{g}-{nb}")
-        blockable = sorted(set(blockable))
-
-        current = set(available_edges)
-
-        for op in blockable:
-            g, _, nb = op.partition('-')
-            e = self._norm_edge(g, nb)
-            if e not in current:
-                continue
-
-            updated = tuple(sorted([x for x in available_edges if x != e]))
-            mod_adj = self._adjacency_from_edges(updated)
-            for u in self.nodes:
-                if self._is_gate(u):
-                    continue
-                for v in self.graph[u]:
-                    if not self._is_gate(v):
-                        mod_adj[u].add(v)
-                        mod_adj[v].add(u)
-
-            rg, _ = self._find_nearest_gate_lex(virus_pos, mod_adj)
-            if rg is None:
-                return (op,)
-
-            next_pos = self._simulate_virus_step(virus_pos, mod_adj)
-            if next_pos is None:
-                next_pos = virus_pos
-            if self._is_gate(next_pos):
-                continue
-
-            cont = self._explore_strategy(next_pos, updated)
-            if cont is not None:
-                return (op,) + cont
-
+def determine_next_move(position: str, destination_hub: str, adjacency):
+    hub_distances = compute_paths_from_hub(destination_hub, adjacency)
+    
+    if position not in hub_distances:
         return None
+    
+    current_distance = hub_distances[position]
+    if current_distance == 0:
+        return None
+    
+    possible_moves = []
+    for neighbor in adjacency[position]:
+        if neighbor in hub_distances and hub_distances[neighbor] == current_distance - 1:
+            possible_moves.append(neighbor)
+    
+    if not possible_moves:
+        return None
+    
+    return sorted(possible_moves)[0]
 
-    def solve(self) -> list[list[str]]:
-        results = []
-        visited = set()
 
-        initial_tuple = self._normalized_edges_tuple()
+def simulate_virus_step(position: str, adjacency):
+    """Симулируем один шаг движения вируса."""
+    target_hub, _ = find_nearest_hub(position, adjacency)
+    if target_hub is None:
+        return position
+    
+    next_node = determine_next_move(position, target_hub, adjacency)
+    return next_node if next_node is not None else position
 
-        def find_all(pos: str, path: list[str]):
-            st = self._key(pos)
-            if st in visited:
-                return
-            visited.add(st)
 
-            if self._find_gate(pos) is None:
-                results.append(path[:])
-                return
+def solve(edges: list[tuple[str, str]]) -> list[str]:
+    """
+    Решение задачи об изоляции вируса
 
-            moves = self._edges()
-            if not moves:
-                plan = self._explore_strategy(pos, initial_tuple)
-                if plan:
-                    results.append(path + list(plan))
-                return
+    Args:
+        edges: список коридоров в формате (узел1, узел2)
 
-            for gate, node in moves:
-                self.graph[gate].remove(node)
-                self.graph[node].remove(gate)
-
-                nxt = self._get_node(pos)
-                if nxt == "__LOSE__":
-                    self.graph[gate].add(node)
-                    self.graph[node].add(gate)
-                else:
-                    if nxt is None:
-                        results.append(path + [f"{gate}-{node}"])
-                        self.graph[gate].add(node)
-                        self.graph[node].add(gate)
-                    else:
-                        find_all(nxt, path + [f"{gate}-{node}"])
-                        self.graph[gate].add(node)
-                        self.graph[node].add(gate)
-
-        find_all(self.virus, [])
-        results.sort()
-        return results[0] if results else []
+    Returns:
+        список отключаемых коридоров в формате "Шлюз-узел"
+    """
+    normalized_edges = tuple(sorted(normalize_connection(x, y) for x, y in edges))
+    
+    @lru_cache(maxsize=None)
+    def explore_strategy(virus_pos: str, available_edges: tuple[tuple[str, str], ...]):
+        network = create_adjacency_map(available_edges)
+        nearest_hub, _ = find_nearest_hub(virus_pos, network)
+        
+        if nearest_hub is None:
+            return ()
+        blockable_paths = []
+        for vertex in network:
+            if not check_if_hub(vertex):
+                continue
+            for connected_node in network[vertex]:
+                if not check_if_hub(connected_node):
+                    blockable_paths.append(f"{vertex}-{connected_node}")
+        
+        blockable_paths = sorted(set(blockable_paths))
+        current_edges = set(available_edges)
+        for block_option in blockable_paths:
+            hub_part, _, regular_part = block_option.partition('-')
+            connection_to_remove = normalize_connection(hub_part, regular_part)
+            
+            if connection_to_remove not in current_edges:
+                continue
+            updated_edges = [e for e in available_edges if e != connection_to_remove]
+            updated_edges_tuple = tuple(sorted(updated_edges))
+            modified_network = create_adjacency_map(updated_edges_tuple)
+            reachable_hub, _ = find_nearest_hub(virus_pos, modified_network)
+            if reachable_hub is None:
+                return (block_option,)
+            virus_next_pos = simulate_virus_step(virus_pos, modified_network)
+            if virus_next_pos is None:
+                virus_next_pos = virus_pos
+            
+            if check_if_hub(virus_next_pos):
+                continue
+            continuation = explore_strategy(virus_next_pos, updated_edges_tuple)
+            if continuation is not None:
+                return (block_option,) + continuation
+        
+        return None
+    
+    result = explore_strategy('a', normalized_edges)
+    return list(result or [])
 
 
 def main():
@@ -257,8 +153,8 @@ def main():
             node1, sep, node2 = line.partition('-')
             if sep:
                 edges.append((node1, node2))
-    solver = Solver(edges)
-    result = solver.solve()
+
+    result = solve(edges)
     for edge in result:
         print(edge)
 
