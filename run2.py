@@ -78,13 +78,13 @@ class Solver:
         
     def solve(self) -> list[list[str]]:
         results = []
-        # visited = set()
+        visited = set()
 
         def find_all(pos: str, path: list[str]):
-            # st = self._key(pos)
-            # if st in visited:
-            #     return
-            # visited.add(st)
+            st = self._key(pos)
+            if st in visited:
+                return
+            visited.add(st)
             
             if self._find_gate(pos) is None:
                 results.append(path[:])
