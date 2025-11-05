@@ -85,6 +85,10 @@ class Solver:
             # if st in visited:
             #     return
             # visited.add(st)
+            
+            if self._find_gate(pos) is None:
+                results.append(path[:])
+                return
             moves = self._edges()
             if not moves:
                 return
