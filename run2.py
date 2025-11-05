@@ -125,8 +125,8 @@ def main():
                 edges.append((node1, node2))
     solver = Solver(edges)
     result = solver.solve()
-    for edge in result:
-        print(edge)
+    # for edge in result:
+    #     print(edge)
 
 if __name__ == "__main__":
     main()
