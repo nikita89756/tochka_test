@@ -33,8 +33,8 @@ class Solver:
                     q.append(nb)
         return dist
 
-    def _find_gate(self) -> tuple[str | None, float,dict[str,float]]:
-        dist = self._bfs(self.virus)
+    def _find_gate(self,pos:str) -> tuple[str | None, float,dict[str,float]]:
+        dist = self._bfs(pos)
         target = None
         min_dist = float('inf')
         for gate in self.gates:
@@ -44,7 +44,7 @@ class Solver:
         return target
 
     def _get_node(self, pos: str) -> str | None:
-        gate = self._find_gate()
+        gate = self._find_gate(pos)
         if gate is None:
             return None
 
